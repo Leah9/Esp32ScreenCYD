@@ -1,0 +1,140 @@
+esphome:
+  name: esp32screen
+  friendly_name: ESP32Screen
+  min_version: 2026.4.0
+  name_add_mac_suffix: false
+
+esp32:
+  variant: esp32
+  framework:
+    type: esp-idf
+
+logger:
+  level: DEBUG
+
+api:
+  encryption:
+    key: !secret esp32screen__encryption_key
+
+ota:
+  platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+# Various ways to configure fonts
+#font:
+    # gfonts://family[@weight]
+  #- file: "gfonts://Roboto"
+  #  id: roboto_20
+  #  size: 20
+
+globals:
+  - type: float
+    id: caseTemp
+
+  
+  
+spi:
+  - id: tft
+    clk_pin: GPIO14
+    mosi_pin: GPIO13
+    miso_pin: GPIO12
+  - id: touch
+    clk_pin: GPIO25
+    mosi_pin: GPIO32
+    miso_pin: GPIO39
+
+display:
+  - platform: mipi_spi
+    spi_id: tft
+    id: display_mipi_spi_1
+    model: ILI9342
+    dc_pin: GPIO2
+    auto_clear_enabled: false
+    update_interval: never
+    #show_test_card: true
+    release_device: false
+    #update_interval: 1s
+    invert_colors: false
+    cs_pin: GPIO15
+    color_order: RGB
+    #lambda: |-
+      #// Write your display rendering code here
+      
+      #     it.printf(0, 10, id(roboto_20), "Fan 1: ");
+      #// For example, draw a line from [x=0,y=0] to [x=50,y=50]
+      #// it.line(0, 0, 50, 50);
+      
+touchscreen:
+  platform: xpt2046
+  spi_id: touch
+  cs_pin: GPIO33
+  interrupt_pin: GPIO36
+  update_interval: 50ms
+  threshold: 400
+  calibration:
+    x_min: 339
+    x_max: 3757
+    y_min: 338
+    y_max: 3775
+  transform:
+    swap_xy: true
+    mirror_x: true
+    mirror_y: true
+#  on_touch:
+#    - lambda: |-
+#          ESP_LOGI("cal", "x=%d, y=%d, x_raw=%d, y_raw=%0d",
+#              touch.x,
+#              touch.y,
+#              touch.x_raw,
+#              touch.y_raw
+#              );
+
+lvgl:
+    default_font: montserrat_18
+    theme:
+      dark_mode: true
+    pages:
+    - id: main_page
+      
+      widgets:
+      - label:
+          id: caseLabel
+          text:
+            format: "Case : %.1f"
+            args: [ 'id(sensor_dallas_temp_1).state' ]
+
+
+# Former led pin in the display config
+output:
+  - platform: ledc
+    pin: 21
+    id: former_led_pin
+
+# Define a monochromatic, dimmable light for the backlight
+light:
+  - platform: monochromatic
+    output: former_led_pin
+    name: "Display Backlight"
+    id: back_light
+    restore_mode: ALWAYS_ON
+
+one_wire:
+  - platform: gpio
+    pin: GPIO22
+    id: one_wire_gpio_1
+
+sensor:
+  - platform: dallas_temp
+    name: case
+    one_wire_id: one_wire_gpio_1
+    id: sensor_dallas_temp_1
+    on_value:
+        then:
+          - lvgl.label.update:
+              id: caseLabel
+              text:
+                format: "Case : %.1f"
+                args: [ 'id(sensor_dallas_temp_1).state' ] 
